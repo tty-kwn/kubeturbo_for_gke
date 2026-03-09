@@ -8,7 +8,7 @@
 # Kubeturbo イメージ設定
 image:
   repository: icr.io/cpopen/turbonomic/kubeturbo
-  tag: 8.14.3  # 最新の安定版を使用
+  tag: 8.19.1  # 最新の安定版を使用
   pullPolicy: IfNotPresent
 
 # レプリカ数（高可用性が必要な場合は 2 以上に設定）
@@ -24,7 +24,7 @@ serverMeta:
   turboServer: ""
   
   # API バージョン
-  version: "8.14"
+  version: "8.19"
   
   # プロキシ設定（必要な場合）
   # proxy: "http://proxy.example.com:8080"
