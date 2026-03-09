@@ -1,0 +1,234 @@
+# Kubeturbo Values for GKE Standard Clusters
+# このファイルは GKE Standard クラスタ向けに最適化された設定です
+
+# ============================================================================
+# 基本設定
+# ============================================================================
+
+# Kubeturbo イメージ設定
+image:
+  repository: icr.io/cpopen/turbonomic/kubeturbo
+  tag: 8.14.3  # 最新の安定版を使用
+  pullPolicy: IfNotPresent
+
+# レプリカ数（高可用性が必要な場合は 2 以上に設定）
+replicaCount: 1
+
+# ============================================================================
+# Turbonomic サーバー接続設定
+# ============================================================================
+
+serverMeta:
+  # Turbonomic サーバーの URL（必須）
+  # 例: https://turbonomic.example.com
+  turboServer: ""
+  
+  # API バージョン
+  version: "8.14"
+  
+  # プロキシ設定（必要な場合）
+  # proxy: "http://proxy.example.com:8080"
+
+# ============================================================================
+# ターゲット設定（Kubernetes クラスタ情報）
+# ============================================================================
+
+targetConfig:
+  # クラスタ名（Turbonomic UI で表示される名前）
+  # GKE クラスタ名と一致させることを推奨
+  targetName: "gke-standard-cluster"
+  
+  # ターゲットタイプ
+  targetType: "Kubernetes"
+
+# ============================================================================
+# 認証設定
+# ============================================================================
+
+# オプション 1: 既存の Secret を使用（推奨）
+restAPIConfig:
+  # 既存の Secret 名を指定
+  # Secret には以下のキーが必要:
+  # - turboUsername: Turbonomic ユーザー名
+  # - turboPassword: Turbonomic パスワード
+  opsManagerUserSecret: "turbonomic-credentials"
+
+# オプション 2: values ファイルで直接指定（テスト環境のみ）
+# 本番環境では使用しないでください
+# restAPIConfig:
+#   turbonomicCredentialsSecretName: ""
+#   opsManagerUserName: "administrator"
+#   opsManagerPassword: "your-password-here"
+
+# ============================================================================
+# リソース設定
+# ============================================================================
+
+resources:
+  limits:
+    # CPU とメモリの上限
+    # Standard GKE では柔軟に設定可能
+    memory: 2Gi
+    cpu: 2000m
+  requests:
+    # 最小リソース要求
+    memory: 1Gi
+    cpu: 500m
+
+# ============================================================================
+# GKE Standard 固有の設定
+# ============================================================================
+
+# ノードセレクタ（特定のノードプールで実行する場合）
+nodeSelector: {}
+  # 例: 専用のノードプールで実行
+  # cloud.google.com/gke-nodepool: "monitoring-pool"
+
+# Tolerations（テイントされたノードで実行する場合）
+tolerations: []
+  # 例:
+  # - key: "monitoring"
+  #   operator: "Equal"
+  #   value: "true"
+  #   effect: "NoSchedule"
+
+# アフィニティ設定
+affinity: {}
+  # 例: 特定のゾーンに配置
+  # nodeAffinity:
+  #   requiredDuringSchedulingIgnoredDuringExecution:
+  #     nodeSelectorTerms:
+  #     - matchExpressions:
+  #       - key: topology.kubernetes.io/zone
+  #         operator: In
+  #         values:
+  #         - asia-northeast1-a
+
+# ============================================================================
+# セキュリティ設定
+# ============================================================================
+
+# Pod セキュリティコンテキスト
+securityContext:
+  # 非 root ユーザーとして実行
+  runAsNonRoot: true
+  runAsUser: 2000
+  fsGroup: 2000
+  
+  # 読み取り専用ルートファイルシステム
+  readOnlyRootFilesystem: true
+  
+  # 特権エスカレーションを無効化
+  allowPrivilegeEscalation: false
+  
+  # Capabilities の削除
+  capabilities:
+    drop:
+      - ALL
+
+# Service Account 設定
+serviceAccount:
+  # Service Account を作成
+  create: true
+  
+  # Service Account 名（空の場合は自動生成）
+  name: ""
+  
+  # GKE Workload Identity の設定（推奨）
+  # annotations:
+  #   iam.gke.io/gcp-service-account: kubeturbo@PROJECT_ID.iam.gserviceaccount.com
+
+# ============================================================================
+# 監視とロギング
+# ============================================================================
+
+# ログレベル（0=Info, 1=Debug, 2=Trace）
+args:
+  logginglevel: 2
+  
+  # Kubernetes API への接続設定
+  kubelethttps: true
+  kubeletport: 10250
+  
+  # スキャン間隔（秒）
+  # デフォルトは 600 秒（10分）
+  # stitchingPropertyType: "IP"
+
+# ============================================================================
+# GKE 統合設定
+# ============================================================================
+
+# GKE メタデータサーバーへのアクセス
+# Workload Identity を使用する場合は有効化
+env:
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    value: "/var/secrets/google/key.json"
+
+# GCP サービスアカウントキーのマウント（Workload Identity 未使用の場合）
+# volumeMounts:
+#   - name: gcp-key
+#     mountPath: /var/secrets/google
+#     readOnly: true
+# 
+# volumes:
+#   - name: gcp-key
+#     secret:
+#       secretName: gcp-service-account-key
+
+# ============================================================================
+# 高可用性設定
+# ============================================================================
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# ============================================================================
+# ネットワーク設定
+# ============================================================================
+
+# Service 設定（通常は不要）
+service:
+  type: ClusterIP
+
+# ============================================================================
+# 追加設定
+# ============================================================================
+
+# カスタムアノテーション
+podAnnotations: {}
+  # 例: Prometheus メトリクスの有効化
+  # prometheus.io/scrape: "true"
+  # prometheus.io/port: "8080"
+
+# カスタムラベル
+podLabels: {}
+  # 例:
+  # environment: production
+  # team: platform
+
+# ============================================================================
+# アップグレード戦略
+# ============================================================================
+
+# Deployment の更新戦略
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# ============================================================================
+# 注意事項
+# ============================================================================
+# 
+# 1. turboServer は必ず設定してください
+# 2. targetName は GKE クラスタ名と一致させることを推奨
+# 3. 認証情報は Kubernetes Secret で管理してください
+# 4. Workload Identity の使用を強く推奨します
+# 5. リソース要求は実際の使用状況に応じて調整してください
+# 
+# ============================================================================
+
+# Made with Bob

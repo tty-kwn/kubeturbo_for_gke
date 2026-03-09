@@ -1,0 +1,280 @@
+# Kubeturbo Values for GKE Autopilot Clusters
+# このファイルは GKE Autopilot クラスタ向けに最適化された設定です
+# Autopilot の制約に準拠しています
+
+# ============================================================================
+# 基本設定
+# ============================================================================
+
+# Kubeturbo イメージ設定
+image:
+  repository: icr.io/cpopen/turbonomic/kubeturbo
+  tag: 8.14.3  # 最新の安定版を使用
+  pullPolicy: IfNotPresent
+
+# レプリカ数
+# Autopilot では自動スケーリングが管理されるため、通常は 1 で十分
+replicaCount: 1
+
+# ============================================================================
+# Turbonomic サーバー接続設定
+# ============================================================================
+
+serverMeta:
+  # Turbonomic サーバーの URL（必須）
+  # 例: https://turbonomic.example.com
+  turboServer: ""
+  
+  # API バージョン
+  version: "8.14"
+  
+  # プロキシ設定（必要な場合）
+  # proxy: "http://proxy.example.com:8080"
+
+# ============================================================================
+# ターゲット設定（Kubernetes クラスタ情報）
+# ============================================================================
+
+targetConfig:
+  # クラスタ名（Turbonomic UI で表示される名前）
+  # GKE クラスタ名と一致させることを推奨
+  targetName: "gke-autopilot-cluster"
+  
+  # ターゲットタイプ
+  targetType: "Kubernetes"
+
+# ============================================================================
+# 認証設定
+# ============================================================================
+
+# オプション 1: 既存の Secret を使用（推奨）
+restAPIConfig:
+  # 既存の Secret 名を指定
+  # Secret には以下のキーが必要:
+  # - turboUsername: Turbonomic ユーザー名
+  # - turboPassword: Turbonomic パスワード
+  opsManagerUserSecret: "turbonomic-credentials"
+
+# オプション 2: values ファイルで直接指定（テスト環境のみ）
+# 本番環境では使用しないでください
+# restAPIConfig:
+#   turbonomicCredentialsSecretName: ""
+#   opsManagerUserName: "administrator"
+#   opsManagerPassword: "your-password-here"
+
+# ============================================================================
+# リソース設定（Autopilot では必須）
+# ============================================================================
+
+# Autopilot では requests と limits の両方を明示的に設定する必要があります
+# また、requests と limits は同じ値にすることが推奨されます
+resources:
+  limits:
+    # Autopilot の推奨値
+    # CPU: 250m, 500m, 1000m のいずれか
+    # メモリ: 256Mi の倍数
+    memory: 2Gi
+    cpu: 1000m
+  requests:
+    # limits と同じ値を設定（Autopilot のベストプラクティス）
+    memory: 2Gi
+    cpu: 1000m
+
+# ============================================================================
+# GKE Autopilot 固有の設定
+# ============================================================================
+
+# Autopilot では以下の設定は使用できません（コメントアウト）
+# - nodeSelector
+# - tolerations
+# - hostNetwork
+# - hostPID
+# - privileged containers
+
+# ノードセレクタ（Autopilot では無効）
+nodeSelector: {}
+
+# Tolerations（Autopilot では無効）
+tolerations: []
+
+# アフィニティ設定（一部のみサポート）
+affinity: {}
+  # Autopilot では Pod アフィニティのみサポート
+  # podAntiAffinity:
+  #   preferredDuringSchedulingIgnoredDuringExecution:
+  #   - weight: 100
+  #     podAffinityTerm:
+  #       labelSelector:
+  #         matchExpressions:
+  #         - key: app.kubernetes.io/name
+  #           operator: In
+  #           values:
+  #           - kubeturbo
+  #       topologyKey: kubernetes.io/hostname
+
+# ============================================================================
+# セキュリティ設定（Autopilot 準拠）
+# ============================================================================
+
+# Pod セキュリティコンテキスト
+# Autopilot では厳格なセキュリティポリシーが適用されます
+securityContext:
+  # 非 root ユーザーとして実行（必須）
+  runAsNonRoot: true
+  runAsUser: 2000
+  fsGroup: 2000
+  
+  # 読み取り専用ルートファイルシステム（推奨）
+  readOnlyRootFilesystem: true
+  
+  # 特権エスカレーションを無効化（必須）
+  allowPrivilegeEscalation: false
+  
+  # Capabilities の削除（必須）
+  capabilities:
+    drop:
+      - ALL
+  
+  # seccomp プロファイル（Autopilot のデフォルト）
+  seccompProfile:
+    type: RuntimeDefault
+
+# Service Account 設定
+serviceAccount:
+  # Service Account を作成
+  create: true
+  
+  # Service Account 名（空の場合は自動生成）
+  name: ""
+  
+  # GKE Workload Identity の設定（強く推奨）
+  # Autopilot では Workload Identity の使用が推奨されます
+  annotations:
+    iam.gke.io/gcp-service-account: "kubeturbo@PROJECT_ID.iam.gserviceaccount.com"
+
+# ============================================================================
+# 監視とロギング
+# ============================================================================
+
+# ログレベル（0=Info, 1=Debug, 2=Trace）
+args:
+  logginglevel: 2
+  
+  # Kubernetes API への接続設定
+  kubelethttps: true
+  kubeletport: 10250
+  
+  # スキャン間隔（秒）
+  # Autopilot では頻繁なスキャンは推奨されません
+  # デフォルトは 600 秒（10分）
+  # stitchingPropertyType: "IP"
+
+# ============================================================================
+# GKE Autopilot 統合設定
+# ============================================================================
+
+# Workload Identity を使用する場合の環境変数
+# Autopilot では Workload Identity の使用が強く推奨されます
+env: []
+  # Workload Identity を使用する場合は不要
+  # - name: GOOGLE_APPLICATION_CREDENTIALS
+  #   value: "/var/secrets/google/key.json"
+
+# Autopilot では外部ボリュームのマウントに制限があります
+# Workload Identity を使用することで、サービスアカウントキーは不要になります
+volumeMounts: []
+volumes: []
+
+# ============================================================================
+# 高可用性設定
+# ============================================================================
+
+# Pod Disruption Budget
+# Autopilot では自動的に管理されますが、明示的に設定することも可能
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# ============================================================================
+# ネットワーク設定
+# ============================================================================
+
+# Service 設定（通常は不要）
+service:
+  type: ClusterIP
+
+# ============================================================================
+# 追加設定
+# ============================================================================
+
+# カスタムアノテーション
+podAnnotations:
+  # Autopilot の自動スケーリングを有効化
+  cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+  
+  # 例: Prometheus メトリクスの有効化
+  # prometheus.io/scrape: "true"
+  # prometheus.io/port: "8080"
+
+# カスタムラベル
+podLabels: {}
+  # 例:
+  # environment: production
+  # team: platform
+
+# ============================================================================
+# アップグレード戦略
+# ============================================================================
+
+# Deployment の更新戦略
+# Autopilot では自動的に最適化されますが、明示的に設定することも可能
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# ============================================================================
+# Autopilot 固有の制約と推奨事項
+# ============================================================================
+# 
+# 1. リソース要求と制限
+#    - requests と limits を必ず設定してください
+#    - 同じ値に設定することが推奨されます
+#    - CPU: 250m, 500m, 1000m のいずれか
+#    - メモリ: 256Mi の倍数
+# 
+# 2. セキュリティ
+#    - 特権コンテナは使用できません
+#    - hostNetwork, hostPID は使用できません
+#    - runAsNonRoot: true が必須です
+# 
+# 3. ノード管理
+#    - nodeSelector は使用できません
+#    - tolerations は使用できません
+#    - ノードは Google が自動管理します
+# 
+# 4. Workload Identity
+#    - Workload Identity の使用を強く推奨します
+#    - サービスアカウントキーのマウントは避けてください
+# 
+# 5. ストレージ
+#    - hostPath ボリュームは使用できません
+#    - emptyDir, ConfigMap, Secret のみサポート
+# 
+# 6. ネットワーク
+#    - LoadBalancer Service は自動的に作成されます
+#    - Network Policy は完全にサポートされます
+# 
+# 7. モニタリング
+#    - Google Cloud Monitoring と統合されます
+#    - カスタムメトリクスも収集可能です
+# 
+# ============================================================================
+# 
+# 詳細については以下を参照してください:
+# https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-overview
+# 
+# ============================================================================
+
+# Made with Bob
